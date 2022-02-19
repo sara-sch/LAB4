@@ -26,7 +26,9 @@ PROCESSOR 16F887
 PSECT udata_shr			 ; Memoria compartida
     W_TEMP:		DS 1
     STATUS_TEMP:	DS 1
-  
+    COUNT:		DS 1
+    CONT:		DS 1	; Contador tabla
+     
 PSECT resVect, class = CODE, abs, delta = 2
 ; ----------- VECTOR RESET ----------------
  
@@ -43,9 +45,11 @@ PUSH:
     SWAPF   STATUS, W
     MOVWF   STATUS_TEMP	    ; Guardamos STATUS
     
-ISR:
+ISR:  
     BTFSC   RBIF
     CALL    INT_IOCB
+    CALL    RESET_TMR0
+    CALL    COUNTER
     
 POP:
     SWAPF   STATUS_TEMP, W
@@ -74,6 +78,8 @@ main:
     CALL CONFIG_RELOJ
     CALL CONFIG_IOCB
     CALL CONFIG_INT
+    CALL CONFIG_TMR0
+    CLRF CONT			; Reinicio de contador para tabla
     BANKSEL PORTA
         
 LOOP:
@@ -93,6 +99,7 @@ CONFIG_IO:
     BCF	    TRISA, 1
     BCF	    TRISA, 2
     BCF	    TRISA, 3
+    CLRF    TRISC		; PORTC como salida
     
     BANKSEL OPTION_REG
     BCF	    OPTION_REG, 7
@@ -104,6 +111,7 @@ CONFIG_IO:
     BANKSEL PORTA
     CLRF    PORTA
     CLRF    PORTB
+    CLRF    PORTC
     
     RETURN
     
@@ -115,11 +123,34 @@ CONFIG_RELOJ:
     BCF OSCCON, 4	; IRCF<2:0> -> 110 4MHz
     RETURN
     
+CONFIG_TMR0:
+    BANKSEL OPTION_REG	; cambiamos de banco
+    BCF T0CS		; TMR0 como temporizador
+    BCF PSA		; prescaler a TMR0
+    BSF PS2
+    BSF PS1
+    BCF PS0		; PS<2:0> -> 111 PRESCALER 1 : 128
+    
+    BANKSEL TMR0	; cambiamos de banco
+    MOVLW 61
+    MOVWF TMR0		; 20ms retardo
+    BCF T0IF		; limpiamos bandera de interrupci[on
+    RETURN
+ 
+RESET_TMR0:
+    BANKSEL TMR0	; cambiamos de banco
+    MOVLW 61
+    MOVWF TMR0		; 20ms retardo
+    BCF T0IF		; limpiamos bandera de interrupcion
+    RETURN
+    
 CONFIG_INT:
     BANKSEL INTCON
     BSF GIE		; Habilitamos interrupciones
     BSF RBIE		; Habilitamos interrupcion RBIE
     BCF RBIF		; Limpia bandera RBIF
+    BSF T0IE		; Habilitamos interrupcion TMR0
+    BCF T0IF		; Limpiamos bandera de TMR0
     RETURN
     
 CONFIG_IOCB:
@@ -127,9 +158,49 @@ CONFIG_IOCB:
     BSF	    IOCB, 0
     BSF	    IOCB, 1
     
-    BANKSEL PORTA
+    BANKSEL PORTB
     MOVF    PORTB, W	; Al leer, deja de hacer mismatch
     BCF	    RBIF
+    RETURN
+    
+COUNTER:
+    INCF    COUNT
+    MOVLW   50
+    XORWF   COUNT, W
+    BTFSS   STATUS, 2
+    RETURN
+    MOVF    CONT, W		; Valor de contador a W para buscarlo en la tabla
+    CALL    TABLA		; Buscamos caracter de CONT en la tabla ASCII
+    INCF    CONT		; Incremento de contador
+    BTFSC   CONT, 4
+    MOVF    CONT		; Mover CONT a W
+    MOVWF   PORTC
+    CLRF    STATUS
+    CLRF    COUNT
+    RETURN
+    
+ORG 200h    
+TABLA:
+    CLRF    PCLATH		; Limpiamos registro PCLATH
+    BSF	    PCLATH, 1		; Posicionamos el PC en dirección 02xxh
+    ANDLW   0x0F		; no saltar más del tamaño de la tabla
+    ADDWF   PCL			; Apuntamos el PC a caracter en ASCII de CONT
+    RETLW   187			; ASCII char 0
+    RETLW   10			; ASCII char 1
+    RETLW   115			; ASCII char 2
+    RETLW   91			; ASCII char 3
+    RETLW   202			; ASCII char 4
+    RETLW   217			; ASCII char 5
+    RETLW   249			; ASCII char 6
+    RETLW   11			; ASCII char 7
+    RETLW   251			; 8
+    RETLW   203			; 9
+    RETLW   235			; A
+    RETLW   248			; b
+    RETLW   177			; C
+    RETLW   122			; d
+    RETLW   241			; E
+    RETLW   225			; F
     RETURN
     
 END
