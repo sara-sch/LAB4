@@ -184,7 +184,6 @@ COUNTER:
     XORWF   CONT, W
     BTFSC   STATUS, 2
     CALL    COUNTERD2
-    
    
     CLRF    STATUS
     CLRF    COUNT
@@ -194,14 +193,28 @@ COUNTERD2:
     CALL    RESET_TMR0
     CLRF    CONT
     
+    INCF    COUNT2
     MOVF    CONT2, W		; Valor de contador a W para buscarlo en la tabla
     CALL    TABLA		; Buscamos caracter de CONT en la tabla ASCII
     MOVWF   PORTD
     INCF    CONT2
-    BTFSC   CONT2, 4
-    CLRF    STATUS
-    CLRF    COUNT2
+    
+    CLRW
+    MOVLW   4
+    XORWF   COUNT2, W
+    BTFSC   STATUS, 2
+    CALL    RESETCNTS
     RETURN
+    
+RESETCNTS:
+    CALL    RESET_TMR0
+    CLRF    CONT
+    CLRF    CONT2
+    CLRF    COUNT
+    CLRF    COUNT2
+    CLRF    STATUS
+    RETURN
+    
     
 ORG 200h    
 TABLA:
