@@ -28,6 +28,8 @@ PSECT udata_shr			 ; Memoria compartida
     STATUS_TEMP:	DS 1
     COUNT:		DS 1
     CONT:		DS 1	; Contador tabla
+    COUNT2:		DS 1
+    CONT2:		DS 1	; Contador tabla
      
 PSECT resVect, class = CODE, abs, delta = 2
 ; ----------- VECTOR RESET ----------------
@@ -80,6 +82,7 @@ main:
     CALL CONFIG_INT
     CALL CONFIG_TMR0
     CLRF CONT			; Reinicio de contador para tabla
+    CLRF CONT2
     BANKSEL PORTA
         
 LOOP:
@@ -100,6 +103,7 @@ CONFIG_IO:
     BCF	    TRISA, 2
     BCF	    TRISA, 3
     CLRF    TRISC		; PORTC como salida
+    CLRF    TRISD
     
     BANKSEL OPTION_REG
     BCF	    OPTION_REG, 7
@@ -112,6 +116,7 @@ CONFIG_IO:
     CLRF    PORTA
     CLRF    PORTB
     CLRF    PORTC
+    CLRF    PORTD
     
     RETURN
     
@@ -171,12 +176,31 @@ COUNTER:
     RETURN
     MOVF    CONT, W		; Valor de contador a W para buscarlo en la tabla
     CALL    TABLA		; Buscamos caracter de CONT en la tabla ASCII
-    INCF    CONT		; Incremento de contador
-    BTFSC   CONT, 4
-    MOVF    CONT		; Mover CONT a W
     MOVWF   PORTC
+    INCF    CONT		; Incremento de contador
+    
+    CLRW
+    MOVLW   11
+    XORWF   CONT, W
+    BTFSC   STATUS, 2
+    CALL    COUNTERD2
+    
+   
     CLRF    STATUS
     CLRF    COUNT
+    RETURN
+    
+COUNTERD2:
+    CALL    RESET_TMR0
+    CLRF    CONT
+    
+    MOVF    CONT2, W		; Valor de contador a W para buscarlo en la tabla
+    CALL    TABLA		; Buscamos caracter de CONT en la tabla ASCII
+    MOVWF   PORTD
+    INCF    CONT2
+    BTFSC   CONT2, 4
+    CLRF    STATUS
+    CLRF    COUNT2
     RETURN
     
 ORG 200h    
